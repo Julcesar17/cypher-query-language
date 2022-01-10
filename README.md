@@ -532,6 +532,90 @@ DETACH DELETE n
 
 Solo debe hacer esto con datasets relativamente pequeñas, ya que ejecutar esta consulta en un dataset grande agotará la memoria.
 
+#### Consultas adicionales:
+
+**1. What people acted in a movie?**
+```
+MATCH (p:Person)-[:ACTED_IN]-(m:Movie)
+WHERE m.title = 'Sleepless in Seattle'
+RETURN p.name AS Actor
+```
+
+**2. What person directed a movie?**
+```
+MATCH (p:Person)-[:DIRECTED]-(m:Movie)
+WHERE m.title = 'Hoffa'
+RETURN  p.name AS Director
+```
+
+**3. What movies did a person act in?**
+```
+MATCH (p:Person)-[:ACTED_IN]-(m:Movie)
+WHERE p.name = 'Tom Hanks'
+RETURN m.title AS Movie
+```
+
+**4. How many users rated a movie?**
+```
+MATCH (u:User)-[:RATED]-(m:Movie)
+WHERE m.title = 'Apollo 13'
+RETURN count(*) AS `Number of reviewers`
+```
+
+**5. Who was the youngest person to act in a movie?**
+```
+MATCH (p:Person)-[:ACTED_IN]-(m:Movie)
+WHERE m.title = 'Hoffa'
+RETURN  p.name AS Actor, p.born as `Year Born` ORDER BY p.born DESC LIMIT 1
+```
+
+**6. What role did a person play in a movie?**
+```
+MATCH (p:Person)-[r:ACTED_IN]-(m:Movie)
+WHERE m.title = 'Sleepless in Seattle' AND
+p.name = 'Meg Ryan'
+RETURN  r.role AS Role
+```
+
+**7. What is the highest rated movie in a particular year according to imDB?**
+```
+MATCH (m:Movie)
+WHERE m.released STARTS WITH '1995'
+RETURN  m.title as Movie, m.imdbRating as Rating ORDER BY m.imdbRating DESC LIMIT 1
+```
+
+La siguiente consulta agrega una pelicula con su director, cambiando la respuesta de la consulta anterior.
+
+```
+//Run the Cypher code to add another Movie node and its director to the graph:
+MERGE (casino:Movie {title: 'Casino', tmdbId: 524, released: '1995-11-22', imdbRating: 8.2, genres: ['Drama','Crime']})
+MERGE (martin:Person {name: 'Martin Scorsese', tmdbId: 1032})
+MERGE (martin)-[:DIRECTED]->(casino)
+```
+
+**8. What drama movies did an actor act in?**
+```
+MATCH (p:Person)-[:ACTED_IN]-(m:Movie)
+WHERE p.name = 'Tom Hanks' AND
+'Drama' IN m.genres
+RETURN m.title AS Movie
+```
+
+**9. What users gave a movie a rating of 5?**
+```
+MATCH (u:User)-[r:RATED]-(m:Movie)
+WHERE m.title = 'Apollo 13' AND
+r.rating = 5
+RETURN u.name as Reviewer
+```
+
+**10. Retorna todo el grafo**
+```
+MATCH (n) RETURN n
+```
+
+---
+
 **Fuente:**
 https://graphacademy.neo4j.com/
 
