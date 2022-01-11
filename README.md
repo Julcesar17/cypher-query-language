@@ -534,41 +534,6 @@ Solo debe hacer esto con datasets relativamente pequeñas, ya que ejecutar esta 
 
 ---
 
-### Agregando etiquetas adicionales a nodos
-
-#### Profile the query
-
-```
-PROFILE MATCH (p:Person)-[:ACTED_IN]-()
-WHERE p.born < '1950'
-RETURN p.name
-```
-
-En la consulta anterior regresan 5 resultados.
-
-#### Refactor the graph
-
-Consulta para agregar etiqueta *Actor* a los nodos *Person*
-
-```
-MATCH (p:Person)
-WHERE exists ((p)-[:ACTED_IN]-())
-SET p:Actor
-```
-
-#### Profile the query
-
-Con el grafo factorizado, podemos cambiar la consulta de *profilling*.
-```
-PROFILE MATCH (p:Actor)-[:ACTED_IN]-()
-WHERE p.born < '1950'
-RETURN p.name
-```
-
-En la consulta anterior regresan 4 resultados.
-
----
-
 ### Consultas adicionales:
 
 **1. What people acted in a movie?**
@@ -649,6 +614,88 @@ RETURN u.name as Reviewer
 **10. Retorna todo el grafo**
 ```
 MATCH (n) RETURN n
+```
+
+---
+### Agregando etiquetas adicionales a nodos y refactorización del grafo
+
+#### Profile the query
+
+```
+PROFILE MATCH (p:Person)-[:ACTED_IN]-()
+WHERE p.born < '1950'
+RETURN p.name
+```
+
+En la consulta anterior regresan 5 resultados.
+
+#### Refactor the graph
+
+Consulta para agregar etiqueta *Actor* a los nodos *Person*
+
+```
+MATCH (p:Person)
+WHERE exists ((p)-[:ACTED_IN]-())
+SET p:Actor
+```
+
+#### Profile the query
+
+Con el grafo factorizado, podemos cambiar la consulta de *profilling*.
+```
+PROFILE MATCH (p:Actor)-[:ACTED_IN]-()
+WHERE p.born < '1950'
+RETURN p.name
+```
+
+En la consulta anterior regresan 4 resultados.
+
+---
+
+### Consultas adicionales despues de la refactorización:
+
+**1. What people acted in a movie?**
+```
+MATCH (p:Actor)-[:ACTED_IN]-(m:Movie)
+WHERE m.title = 'Sleepless in Seattle'
+RETURN p.name AS Actor
+```
+
+**3. What movies did a person act in?**
+```
+MATCH (p:Actor)-[:ACTED_IN]-(m:Movie)
+WHERE p.name = 'Tom Hanks'
+RETURN m.title AS Movie
+```
+
+**5. Who was the youngest person to act in a movie?**
+```
+MATCH (p:Actor)-[:ACTED_IN]-(m:Movie)
+WHERE m.title = 'Hoffa'
+RETURN  p.name AS Actor, p.born as `Year Born` ORDER BY p.born DESC LIMIT 1
+```
+
+**6. What role did a person play in a movie?**
+```
+MATCH (p:Actor)-[r:ACTED_IN]-(m:Movie)
+WHERE m.title = 'Sleepless in Seattle' AND
+p.name = 'Meg Ryan'
+RETURN  r.role AS Role
+```
+
+**8. What drama movies did an actor act in?**
+```
+MATCH (p:Actor)-[:ACTED_IN]-(m:Movie)
+WHERE p.name = 'Tom Hanks' AND
+'Drama' IN m.genres
+RETURN m.title AS Movie
+```
+
+**10. What actors were born before 1950?**
+```
+MATCH (p:Actor)
+WHERE p.born < '1950'
+RETURN p.name
 ```
 
 ---
