@@ -532,7 +532,44 @@ DETACH DELETE n
 
 Solo debe hacer esto con datasets relativamente pequeñas, ya que ejecutar esta consulta en un dataset grande agotará la memoria.
 
-#### Consultas adicionales:
+---
+
+### Agregando etiquetas adicionales a nodos
+
+#### Profile the query
+
+```
+PROFILE MATCH (p:Person)-[:ACTED_IN]-()
+WHERE p.born < '1950'
+RETURN p.name
+```
+
+En la consulta anterior regresan 5 resultados.
+
+#### Refactor the graph
+
+Consulta para agregar etiqueta *Actor* a los nodos *Person*
+
+```
+MATCH (p:Person)
+WHERE exists ((p)-[:ACTED_IN]-())
+SET p:Actor
+```
+
+#### Profile the query
+
+Con el grafo factorizado, podemos cambiar la consulta de *profilling*.
+```
+PROFILE MATCH (p:Actor)-[:ACTED_IN]-()
+WHERE p.born < '1950'
+RETURN p.name
+```
+
+En la consulta anterior regresan 4 resultados.
+
+---
+
+### Consultas adicionales:
 
 **1. What people acted in a movie?**
 ```
