@@ -700,6 +700,27 @@ RETURN p.name
 
 ---
 
+### Creando nodos *languages*
+
+Consulta para crear nodos *languages*, eliminar propiedad *languages* de los nodos *Movie* y relacionarlos entre si.
+
+```
+MATCH (m:Movie)
+UNWIND m.languages AS language
+WITH  language, collect(m) AS movies
+MERGE (l:Language {name:language})
+WITH l, movies
+UNWIND movies AS m
+WITH l,m
+MERGE (m)-[:IN_LANGUAGE]->(l);
+MATCH (m:Movie)
+SET m.languages = null
+```
+
+Sentencia `UNWIND` sirve para separar una lista de elementos.
+
+---
+
 **Fuente:**
 https://graphacademy.neo4j.com/
 
