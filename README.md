@@ -799,6 +799,37 @@ MATCH (p:Person)-[:ACTED_IN_1995|DIRECTED_1995]-()
 RETURN p.name as `Actor or Director`
 ```
 
+Reescribiendo una nueva consulta, refactorizando relaciones `RATED`:
+
+**9. What users gave a movie a rating of 5?**
+
+El siguiente código refactoriza las relaciones RATED en el grafo:
+
+```
+MATCH (n:User)-[r:RATED]->(m:Movie)
+CALL apoc.merge.relationship(n,
+                              'RATED_' + toString(r.rating),
+                              {},
+                              {},
+                              m,
+                              {}) YIELD rel
+RETURN COUNT(*) AS `Number of relationships merged`
+```
+
+Después de la refactorización, las consultas pueden reescribirse de la siguiente manera:
+
+```
+MATCH (u:User)-[r:RATED]-(m:Movie)
+WHERE m.title = 'Apollo 13' AND
+r.rating = 5
+RETURN u.name as Reviewer
+```
+
+```
+MATCH (u:User)-[r:RATED_5]-(m:Movie)
+WHERE m.title = 'Apollo 13'
+RETURN u.name as Reviewer
+```
 ---
 
 **Fuente:**
