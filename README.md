@@ -700,9 +700,9 @@ RETURN p.name
 
 ---
 
-### Creando nodos *languages*
+### Creando nodos *Languages*
 
-Consulta para crear nodos *languages*, eliminar propiedad *languages* de los nodos *Movie* y relacionarlos entre si.
+Consulta para crear nodos *Languages*, eliminar propiedad *Languages* de los nodos *Movie* y relacionarlos entre si.
 
 ```
 MATCH (m:Movie)
@@ -718,6 +718,86 @@ SET m.languages = null
 ```
 
 Sentencia `UNWIND` sirve para separar una lista de elementos.
+
+### Creando nodos *Genre*
+
+Consulta para crear nodos *Genre*, eliminar propiedad *Genre* de los nodos *Movie* y relacionarlos entre si.
+
+```
+MATCH (m:Movie)
+UNWIND m.genres AS genre
+WITH genre, collect(m) AS movies
+MERGE (g:Genre {name:genre})
+WITH g, movies
+UNWIND movies AS m
+WITH g,m
+MERGE (m)-[:IN_GENRE]->(g)
+MATCH (m:Movie)
+SET m.genres = null
+```
+
+Consulta de 2 relaciones:
+
+```
+MATCH (p:Actor)-[:ACTED_IN]-(m:Movie)-[IN_GENRE]-(g:Genre)
+WHERE p.name = 'Tom Hanks' AND  g.name = 'Drama'
+RETURN m.title AS Movie
+```
+
+### Refactorizando a relaciones especializadas
+
+Se consideran los siguientes casos de uso:
+
+**What movies did an actor act in for a particular year?**
+
+```
+MATCH (p:Actor)-[:ACTED_IN]-(m:Movie)
+WHERE p.name = 'Tom Hanks' AND
+m.released STARTS WITH '1995'
+RETURN m.title AS Movie
+```
+
+**What actors or directors worked in a particular year?**
+
+```
+MATCH (p:Person)--(m:Movie)
+WHERE  m.released STARTS WITH '1995'
+RETURN DISTINCT p.name as `Actor or Director`
+```
+
+Las consultas anteriores regresan todos los nodos para poder filtrar por el año de lanzamiento.
+
+Las consultas que refactorizan el grafo para agregar relaciones especializadas usan la libreria APOC.
+
+El siguiente código refactoriza las relaciones ACTED_IN en el grafo:
+
+```
+MATCH (n:Actor)-[r:ACTED_IN]->(m:Movie)
+CALL apoc.merge.relationship(n,
+                              'ACTED_IN_' + left(m.released,4),
+                              {},
+                              m ) YIELD rel
+RETURN COUNT(*) AS `Number of relationships merged`
+```
+
+La sentencia `apoc.merge.relationship` permiten crear relaciones dinámicamente en el grafo,utilizando los 4 caracteres de la izquierda de la propiedad utilizada para crear el nombre de la relación.
+
+Después de la refactorización, las consultas pueden reescribirse de la siguiente manera:
+
+**What movies did an actor act in for a particular year?**
+
+```
+MATCH (p:Actor)-[:ACTED_IN_1995]-(m:Movie)
+WHERE p.name = 'Tom Hanks'
+RETURN m.title AS Movie
+```
+
+**What actors or directors worked in a particular year?**
+
+```
+MATCH (p:Person)-[:ACTED_IN_1995|DIRECTED_1995]-()
+RETURN p.name as `Actor or Director`
+```
 
 ---
 
