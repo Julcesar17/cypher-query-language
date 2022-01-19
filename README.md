@@ -830,6 +830,52 @@ MATCH (u:User)-[r:RATED_5]-(m:Movie)
 WHERE m.title = 'Apollo 13'
 RETURN u.name as Reviewer
 ```
+
+#### Agregando nodos intermedios
+
+En algunas ocasiones se necesitan conectar más datos a una relación de los que se pueden capturar completamente en las propiedades. En otras palabras, se necesita crear una relación que conecte más de dos nodos. Esto es imposible en las bases de datos basados en grafos, pero hay una solución es crear nodos intermedios.
+
+Se crean nodos intermedios cuando se necesite:
+
+- Conectar más de dos nodos en un solo contexto.
+- Relacionar datos con una relación.
+- Compartir datos en el grafo entre entidades.
+
+Estos tres casos de uso se utilizan para hacer que las relaciones de los grafos sean más significativas y compartibles entre los nodos.
+
+**Agregando nodos intermedios al modelo `Movies`**
+
+Se modifican las relaciones *ACTED_IN* para poder realizar analisis nás detallados sobre la propiedad *role*.
+
+**¿Cómo se refactorizaría el grafo para agregar un nodo intermedio que represente la propiedad del rol de la relación *ACTED_IN*?**
+
+Se agrega un nodo *Role* utilizando la propiedad role de la relación *ACTED_IN*.
+
+Los pasos para refactorizar y crar los nodos *Role*, son los siguientes:
+
+1. Se buscan los actores que actuaron en las peliculas (`MATCH (a:Actor)-[r:ACTED_IN]-(m:Movie)`).
+2. Se crean (usando `MERGE`) los nodos *Role* asignando el nombre a partir de la propiedad role en la relación *ACTED_IN*.
+3. Se crean (usando `MERGE`) las relaciones *PLAYED* entre los nodos *Actor* y *Role*.
+4. Se crean (usando `MERGE`) las relaciones *IN_MOVIE* entre los nodos *Movie* y *Role*.
+5. Se elimina la propiedad *role* de las relaciones *ACTED_IN* (se setea a null).
+
+Consulta que hace los pasos anteriores:
+
+```
+MATCH (a:Actor)-[acted:ACTED_IN]-(m:Movie)
+UNWIND acted.role AS role
+WITH role, collect(a) AS actors,collect(m) AS movies
+MERGE (r:Role {name:role})
+WITH r, actors,movies
+UNWIND actors AS ac
+UNWIND movies AS mo
+WITH r,ac,mo
+MERGE (ac)-[:PLAYED]->(r)
+MERGE (r)-[:IN_MOVIE]->(mo)
+MATCH (a:Actor)-[r:ACTED_IN]-(m:Movie)
+SET r.role = null
+```
+
 ---
 
 **Fuente:**
