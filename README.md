@@ -876,6 +876,285 @@ MATCH (a:Actor)-[r:ACTED_IN]-(m:Movie)
 SET r.role = null
 ```
 
+### Importar Datos desde un archivo CSV
+
+Consulta en Cypher para leer datos en un archivo CSV, con encabezados y una url especifica:
+
+```
+LOAD CSV WITH HEADERS
+FROM 'https://data.neo4j.com/importing/ratings.csv'
+AS row
+RETURN count(row)
+```
+
+Consulta para convertir valores tipo string a valores tipo `date(property)`:
+
+```
+MATCH (p:Person)
+SET p.born = CASE p.born WHEN "" THEN null ELSE date(p.born) END
+WITH p
+SET p.died = CASE p.died WHEN "" THEN null ELSE date(p.died) END
+```
+
+Con la siguiente consulta se puede verificar los tipos de datos almacenados para las propiedades de un nodo:
+
+```
+CALL apoc.meta.nodeTypeProperties()
+```
+
+Consulta para verificar los tipos de datos almacenados para las propiedades de una relación:
+
+```
+CALL apoc.meta.relTypeProperties()
+```
+
+#### Transformar propiedades de lista
+
+`coalesce()` identifica cada elemento de la lista donde el "|" el carácter es el separador. Luego usa `split()` para crear una lista de cada elemento.
+
+```
+MATCH (m:Movie)
+SET m.countries = split(coalesce(m.countries,""), "|"),
+m.languages = split(coalesce(m.languages,""), "|"),
+m.genres = split(coalesce(m.genres,""), "|")
+```
+
+#### Agregando Label *Actor* y label *Director* al nodo *Person*
+
+Actor:
+
+```
+MATCH (p:Person)-[:ACTED_IN]->()
+WITH DISTINCT p SET p:Actor
+```
+
+Director:
+
+```
+MATCH (p:Person)-[:DIRECTED]->()
+WITH DISTINCT p SET p:Director
+```
+
+#### Agregando rectricciones unicos a nodos
+
+Sentencia para verificar las rectricciones definidas en un grafo `SHOW CONSTRAINTS`.
+
+La siguienrte consulta para crear una restricción de unicidad para la propiedad de *name* de los nodos de *Genre*:
+
+```
+CREATE CONSTRAINT Genre_name ON (g:Genre) ASSERT g.name IS UNIQUE
+```
+
+#### Visualización de esquema final
+
+```
+CALL db.schema.visualization
+```
+
+#### Importar Dataset demasiados grandes
+
+Sentencia `USING PERIODIC COMMIT`
+
+Consulta para importar un gran conjunto de datos:
+
+```
+:auto USING PERIODIC COMMIT LOAD CSV WITH HEADERS
+FROM 'url-for-CSV-file'
+AS row
+/// add data to the graph for each row
+```
+
+La anterior consulta importa en bloques de 500 filas, las verifica y continúa con la importación.
+
+#### Importar datos *Movie* and *Genre*
+
+```
+LOAD CSV WITH HEADERS
+FROM 'https://data.neo4j.com/importing/2-movieData.csv'
+AS row
+//process only Movie rows
+WITH row WHERE row.Entity = "Movie"
+RETURN
+row.tmdbId,
+row.imdbId,
+toFloat(row.imdbRating),
+row.released,
+row.title,
+toInteger(row.year),
+row.poster,
+toInteger(row.runtime),
+split(coalesce(row.countries,""), "|"),
+toInteger(row.imdbVotes),
+toInteger(row.revenue),
+row.plot,
+row.url,
+toInteger(row.budget),
+split(coalesce(row.languages,""), "|"),
+split(coalesce(row.genres,""), "|")
+LIMIT 10
+```
+
+Consulta que importa y ejecuta las transformaciones necesarias, crea los nodos *Movie* y *Genre* y se crea la relación *IN_GENRE*.
+
+```
+:auto USING PERIODIC COMMIT
+LOAD CSV WITH HEADERS
+FROM 'https://data.neo4j.com/importing/2-movieData.csv'
+AS row
+//process only Movie rows
+WITH row WHERE row.Entity = "Movie"
+MERGE (m:Movie {movieId: row.movieId})
+ON CREATE SET
+m.tmdbId = row.tmdbId,
+m.imdbId = row.imdbId,
+m.imdbRating = toFloat(row.imdbRating),
+m.released = row.released,
+m.title = row.title,
+m.year = toInteger(row.year),
+m.poster = row.poster,
+m.runtime = toInteger(row.runtime),
+m.countries = split(coalesce(row.countries,""), "|"),
+m.imdbVotes = toInteger(row.imdbVotes),
+m.revenue = toInteger(row.revenue),
+m.plot = row.plot,
+m.url = row.url,
+m.budget = toInteger(row.budget),
+m.languages = split(coalesce(row.languages,""), "|")
+WITH m,split(coalesce(row.genres,""), "|") AS genres
+UNWIND genres AS genre
+WITH m, genre
+MERGE (g:Genre {name:genre})
+MERGE (m)-[:IN_GENRE]->(g)
+```
+
+#### Importar datos *Person*
+
+Verificar propiedades de datos:
+
+```
+LOAD CSV WITH HEADERS
+FROM 'https://data.neo4j.com/importing/2-movieData.csv'
+AS row
+WITH row WHERE row.Entity = "Person"
+RETURN
+row.tmdbId,
+row.imdbId,
+row.bornIn,
+row.name,
+row.bio,
+row.poster,
+row.url,
+CASE row.born WHEN "" THEN null ELSE date(row.born) END,
+CASE row.died WHEN "" THEN null ELSE date(row.died) END
+LIMIT 10
+```
+
+Consulta que importa y ejecuta las transformaciones necesarias, crea el nodo *Actor* se crea la relación *ACTED_IN*.
+
+```
+:auto USING PERIODIC COMMIT
+LOAD CSV WITH HEADERS
+FROM 'https://data.neo4j.com/importing/2-movieData.csv'
+AS row
+WITH row WHERE row.Entity = "Person"
+MERGE (p:Person {tmdbId: row.tmdbId})
+ON CREATE SET
+p.imdbId = row.imdbId,
+p.bornIn = row.bornIn,
+p.name = row.name,
+p.bio = row.bio,
+p.poster = row.poster,
+p.url = row.url,
+p.born = CASE row.born WHEN "" THEN null ELSE date(row.born) END,
+p.died = CASE row.died WHEN "" THEN null ELSE date(row.died) END
+```
+
+#### Importar relaciones *ACTED_IN*
+
+```
+LOAD CSV WITH HEADERS
+FROM 'https://data.neo4j.com/importing/2-movieData.csv'
+AS row
+WITH row WHERE row.Entity = "Join" AND row.Work = "Acting"
+RETURN
+row.tmdbId,
+row.movieId,
+row.role
+LIMIT 10
+```
+
+```
+:auto USING PERIODIC COMMIT
+LOAD CSV WITH HEADERS
+FROM 'https://data.neo4j.com/importing/2-movieData.csv'
+AS row
+WITH row WHERE row.Entity = "Join" AND row.Work = "Acting"
+MATCH (p:Person {tmdbId: row.tmdbId})
+MATCH (m:Movie {movieId: row.movieId})
+MERGE (p)-[r:ACTED_IN]->(m)
+ON CREATE
+SET r.role = row.role
+SET p:Actor
+```
+
+#### Importar relaciones *DIRECTED*
+
+```
+LOAD CSV WITH HEADERS
+FROM 'https://data.neo4j.com/importing/2-movieData.csv'
+AS row
+WITH row WHERE row.Entity = "Join" AND row.Work = "Directing"
+RETURN
+row.tmdbId,
+row.movieId,
+row.role
+LIMIT 10
+```
+
+```
+:auto USING PERIODIC COMMIT
+LOAD CSV WITH HEADERS
+FROM 'https://data.neo4j.com/importing/2-movieData.csv'
+AS row
+WITH row WHERE row.Entity = "Join" AND row.Work = "Directing"
+MATCH (p:Person {tmdbId: row.tmdbId})
+MATCH (m:Movie {movieId: row.movieId})
+MERGE (p)-[r:DIRECTED]->(m)
+ON CREATE
+SET r.role = row.role
+SET p:Director
+```
+
+#### Importar datos *User*
+
+```
+LOAD CSV WITH HEADERS
+FROM 'https://data.neo4j.com/importing/2-ratingData.csv'
+AS row
+RETURN
+row.movieId,
+row.userId,
+row.name,
+toInteger(row.rating),
+toInteger(row.timestamp)
+LIMIT 100
+```
+
+Se crean los nodos *User* y las relaciones *RATED*
+
+```
+:auto USING PERIODIC COMMIT
+LOAD CSV WITH HEADERS
+FROM 'https://data.neo4j.com/importing/2-ratingData.csv'
+AS row
+MATCH (m:Movie {movieId: row.movieId})
+MERGE (u:User {userId: row.userId})
+ON CREATE SET u.name = row.name
+MERGE (u)-[r:RATED]->(m)
+ON CREATE SET r.rating = toInteger(row.rating),
+r.timestamp = toInteger(row.timestamp)
+```
+
 ---
 
 **Fuente:**
